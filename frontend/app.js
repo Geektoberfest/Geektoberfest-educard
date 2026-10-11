@@ -443,3 +443,24 @@ function escapeXml(unsafe) {
     }
   });
 }
+(function initTheme() {
+  const toggleBtn = document.getElementById('theme-toggle');
+  const themeText = document.getElementById('theme-text');
+
+  if (!toggleBtn) return;
+
+  const savedTheme = localStorage.getItem('educards_theme');
+  if (savedTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+    if (themeText) themeText.textContent = 'Light';
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('educards_theme', isDark ? 'dark' : 'light');
+    if (themeText) {
+      themeText.textContent = isDark ? 'Light' : 'Dark';
+    }
+  });
+})();
