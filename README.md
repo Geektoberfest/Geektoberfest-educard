@@ -102,7 +102,34 @@ python -m pytest backend/ -v
 - `POST /api/decks/generate` — Generate study deck using Gen AI & RAG
 - `GET /api/materials` — List uploaded RAG materials
 - `POST /api/materials/upload` — Upload and index a PDF/TXT syllabus
-- `POST /api/ai/explain` — Get adaptive AI explanation for incorrect answers
+- `POST /api/ai/explain` — Get adaptive AI explanation or staged hint ladder for incorrect answers.
+  - Parameters: `question` (str), `user_answer` (str), `correct_answer` (str), `understanding_level` (str, default `"Beginner"`), `hint_level` (int 1-4, default `4`), `learner_attempt` (str, optional).
+
+  | hint_level | Content |
+  |---|---|
+  | 1 | A guiding question, no answer |
+  | 2 | A conceptual hint |
+  | 3 | A partial worked step |
+  | 4 | The full explanation (default) |
+
+  Example request:
+  ```json
+  {
+    "question": "What is the powerhouse of the cell?",
+    "user_answer": "Nucleus",
+    "correct_answer": "Mitochondria",
+    "understanding_level": "Beginner",
+    "hint_level": 1,
+    "learner_attempt": "Nucleus"
+  }
+  ```
+
+  Example response:
+  ```json
+  {
+    "explanation": "At a Beginner level: Consider 'What is the powerhouse of the cell?'. What key concept or mechanism plays the primary role here?"
+  }
+  ```
 - `POST /api/decks/{id}/mindmap` — Generate mindmap for study deck using Gen AI
 
 ---
