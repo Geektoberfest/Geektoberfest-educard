@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.models import Card, Deck
 from backend.rag import retrieve_relevant_context
 
@@ -76,16 +76,51 @@ def generate_ai_deck(topic: str, card_type: str, count: int, materials: List[str
         "cards": cards
     }
 
-def generate_ai_explanation(question: str, user_answer: str, correct_answer: str, understanding_level: str) -> str:
+HINT_INSTRUCTIONS = {
+    1: "Ask ONE guiding question that points the learner toward the idea; give no answer, no explanation, no definition of the answer.",
+    2: "Give a short conceptual hint naming the underlying concept or rule, without stating the answer.",
+    3: "Show only the first partial step of the working or reasoning, and stop before the conclusion.",
+    4: "Provide a clear, encouraging explanation addressing:\n1. Why the student's answer ({user_answer}) is incorrect.\n2. What the correct answer ({correct_answer}) is and why.\n3. Explained tailored precisely to the '{understanding_level}' level.",
+}
+
+def _get_canned_explanation(
+    question: str,
+    user_answer: str,
+    correct_answer: str,
+    understanding_level: str,
+    hint_level: int = 4
+) -> str:
+    if hint_level == 1:
+        return f"At a {understanding_level} level: Consider '{question}'. What key concept or mechanism plays the primary role here?"
+    elif hint_level == 2:
+        return f"At a {understanding_level} level: Focus on the foundational concepts behind '{question}'. Recall the core rule or definition."
+    elif hint_level == 3:
+        return f"At a {understanding_level} level: Step 1: Break down '{question}' into its components and eliminate what doesn't fit."
+    return (
+        f"At a {understanding_level} level: Your answer '{user_answer}' is not quite right. "
+        f"The correct answer is '{correct_answer}'. "
+        f"Here's why: EduCards AI notes that '{correct_answer}' satisfies all conditions of the question '{question}'."
+    )
+
+def generate_ai_explanation(
+    question: str,
+    user_answer: str,
+    correct_answer: str,
+    understanding_level: str,
+    hint_level: int = 4,
+    learner_attempt: Optional[str] = None
+) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
         try:
             from google import genai
             client = genai.Client(api_key=api_key)
-            prompt = f"""
+            attempt_line = f"\nLearner's Attempt: {learner_attempt.strip()}" if (learner_attempt and learner_attempt.strip()) else ""
+            if hint_level == 4:
+                prompt = f"""
             The student answered a study question incorrectly.
             Question: {question}
-            Student's Answer: {user_answer}
+            Student's Answer: {user_answer}{attempt_line}
             Correct Answer: {correct_answer}
             Target Understanding Level: {understanding_level} (e.g. ELI5 = Explain like I am 5, Beginner, Intermediate, Advanced)
             
@@ -94,20 +129,33 @@ def generate_ai_explanation(question: str, user_answer: str, correct_answer: str
             2. What the correct answer ({correct_answer}) is and why.
             3. Explained tailored precisely to the '{understanding_level}' level.
             """
+            else:
+                instruction = HINT_INSTRUCTIONS.get(hint_level, "")
+                prompt = f"""
+            The student answered a study question incorrectly.
+            Question: {question}
+            Student's Answer: {user_answer}{attempt_line}
+            Correct Answer: {correct_answer}
+            Target Understanding Level: {understanding_level} (e.g. ELI5 = Explain like I am 5, Beginner, Intermediate, Advanced)
+            
+            Instruction: {instruction}
+            Never reveal, state, or paraphrase the correct answer.
+            Explain tailored precisely to the '{understanding_level}' level.
+            """
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
             )
-            return response.text.strip()
+            text = response.text.strip()
+            if 1 <= hint_level <= 3 and correct_answer and correct_answer.strip():
+                if correct_answer.strip().lower() in text.lower():
+                    return _get_canned_explanation(question, user_answer, correct_answer, understanding_level, hint_level)
+            return text
         except Exception as e:
             print(f"Gemini explain API failed, using fallback: {e}")
 
     # Fallback explanation
-    return (
-        f"At a {understanding_level} level: Your answer '{user_answer}' is not quite right. "
-        f"The correct answer is '{correct_answer}'. "
-        f"Here's why: EduCards AI notes that '{correct_answer}' satisfies all conditions of the question '{question}'."
-    )
+    return _get_canned_explanation(question, user_answer, correct_answer, understanding_level, hint_level)
 
 def generate_mindmap(deck: Any) -> Dict[str, Any]:
     deck_title = getattr(deck, "title", None) or (deck.get("title") if isinstance(deck, dict) else "Study Deck")

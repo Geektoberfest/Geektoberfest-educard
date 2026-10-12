@@ -141,7 +141,9 @@ def explain_answer(req: ExplainRequest):
         req.question,
         req.user_answer,
         req.correct_answer,
-        req.understanding_level
+        req.understanding_level,
+        hint_level=req.hint_level,
+        learner_attempt=req.learner_attempt
     )
     return {"explanation": explanation}
 

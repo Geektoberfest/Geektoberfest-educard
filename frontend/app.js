@@ -3,6 +3,9 @@ let currentMaterials = [];
 let currentDeck = null;
 let currentCardIndex = 0;
 let currentWrongContext = null;
+let hintLevel = 0;
+let displayedHints = [];
+
 
 document.addEventListener("DOMContentLoaded", () => {
   loadDecks();
@@ -183,6 +186,7 @@ function startPractice(deckId) {
     return;
   }
   currentCardIndex = 0;
+  resetHintState();
   document.getElementById("practice-deck-title").innerText = currentDeck.title;
   switchView("practice");
   renderCard();
@@ -255,34 +259,79 @@ function checkMcqAnswer(selected, correct, question) {
 
 function nextCard() {
   if (!currentDeck) return;
+  resetHintState();
   currentCardIndex = (currentCardIndex + 1) % currentDeck.cards.length;
   renderCard();
 }
 
 function prevCard() {
   if (!currentDeck) return;
+  resetHintState();
   currentCardIndex = (currentCardIndex - 1 + currentDeck.cards.length) % currentDeck.cards.length;
   renderCard();
 }
 
 function openExplainerModal() {
   if (!currentWrongContext) return;
+  resetHintState();
   document.getElementById("explainer-question-title").innerText = currentWrongContext.question;
   document.getElementById("explainer-summary").innerText = `You answered "${currentWrongContext.user_answer}". The correct answer is "${currentWrongContext.correct_answer}".`;
   document.getElementById("explainer-modal").classList.add("active");
-  fetchAiExplanation();
 }
 
 function closeExplainerModal() {
   document.getElementById("explainer-modal").classList.remove("active");
 }
 
-async function fetchAiExplanation() {
-  if (!currentWrongContext) return;
-  const level = document.getElementById("understanding-level").value;
-  const explainerText = document.getElementById("explainer-text");
-  explainerText.innerText = "Consulting EduCards AI tutor...";
+function resetHintState() {
+  hintLevel = 0;
+  displayedHints = [];
+  renderHints();
+  updateHintButton();
+}
 
+function updateHintButton() {
+  const btn = document.getElementById("hint-btn");
+  if (!btn) return;
+  if (hintLevel >= 4) {
+    btn.style.display = "none";
+    btn.disabled = true;
+  } else {
+    btn.style.display = "inline-flex";
+    btn.disabled = false;
+    if (hintLevel === 3) {
+      btn.innerText = "Show full explanation";
+    } else {
+      btn.innerText = "Give me a hint";
+    }
+  }
+}
+
+function renderHints() {
+  const container = document.getElementById("explainer-text");
+  if (!container) return;
+  if (!displayedHints.length) {
+    container.innerText = "Click 'Give me a hint' to get started.";
+    return;
+  }
+  container.innerHTML = displayedHints.map(h => `
+    <div class="hint-item">
+      <strong style="color: var(--accent);">${h.level === 4 ? "Full Explanation" : `Hint ${h.level}`}:</strong>
+      <div style="margin-top: 0.25rem; color: var(--text-primary);">${escapeXml(h.text)}</div>
+    </div>
+  `).join("");
+}
+
+async function requestNextHint() {
+  if (hintLevel >= 4 || !currentWrongContext) return;
+  const targetLevel = hintLevel + 1;
+  const btn = document.getElementById("hint-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Loading...";
+  }
+
+  const level = document.getElementById("understanding-level").value;
   try {
     const res = await fetch("/api/ai/explain", {
       method: "POST",
@@ -291,19 +340,54 @@ async function fetchAiExplanation() {
         question: currentWrongContext.question,
         user_answer: currentWrongContext.user_answer,
         correct_answer: currentWrongContext.correct_answer,
-        understanding_level: level
+        understanding_level: level,
+        hint_level: targetLevel,
+        learner_attempt: currentWrongContext.user_answer || null
       })
     });
 
     if (res.ok) {
       const data = await res.json();
-      explainerText.innerText = data.explanation;
+      hintLevel = targetLevel;
+      displayedHints.push({ level: hintLevel, text: data.explanation });
+      renderHints();
     } else {
-      explainerText.innerText = "Unable to fetch AI explanation at this moment.";
+      alert("Failed to fetch hint.");
+    }
+  } catch (err) {
+    console.error("Hint error", err);
+    alert("Error fetching hint.");
+  } finally {
+    updateHintButton();
+  }
+}
+
+async function fetchAiExplanation() {
+  if (!currentWrongContext || hintLevel === 0) return;
+  const level = document.getElementById("understanding-level").value;
+  try {
+    const res = await fetch("/api/ai/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: currentWrongContext.question,
+        user_answer: currentWrongContext.user_answer,
+        correct_answer: currentWrongContext.correct_answer,
+        understanding_level: level,
+        hint_level: hintLevel,
+        learner_attempt: currentWrongContext.user_answer || null
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (displayedHints.length > 0) {
+        displayedHints[displayedHints.length - 1].text = data.explanation;
+        renderHints();
+      }
     }
   } catch (err) {
     console.error("Explainer error", err);
-    explainerText.innerText = "Error connecting to AI explainer service.";
   }
 }
 
