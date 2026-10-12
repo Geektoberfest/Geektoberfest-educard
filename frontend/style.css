@@ -346,3 +346,15 @@ input:focus, select:focus, textarea:focus {
 .mindmap-child-node text {
   user-select: none;
 }
+
+.hint-item {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hint-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}

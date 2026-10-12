@@ -157,9 +157,13 @@
         </select>
       </div>
 
+      <div style="margin-bottom: 1rem;">
+        <button id="hint-btn" class="btn" onclick="requestNextHint()">Give me a hint</button>
+      </div>
+
       <div class="panel" style="background: #F8FAFC; margin-bottom: 0; padding: 1.25rem;">
         <strong style="display: block; margin-bottom: 0.5rem; color: var(--primary);">AI Tutor Explanation:</strong>
-        <p id="explainer-text" style="color: var(--text-primary); white-space: pre-wrap;">Loading explanation...</p>
+        <div id="explainer-text" style="color: var(--text-primary); white-space: pre-wrap;">Click &quot;Give me a hint&quot; to get started.</div>
       </div>
     </div>
   </div>
