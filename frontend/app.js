@@ -5,10 +5,14 @@ let currentCardIndex = 0;
 let currentWrongContext = null;
 let hintLevel = 0;
 let displayedHints = [];
+let thinkFirstEnabled = localStorage.getItem("thinkFirstEnabled") !== "false";
+let currentRecallAttempt = "";
+let isFlashcardFlipped = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   loadDecks();
   loadMaterials();
+  syncThinkFirstCheckboxes();
 });
 
 function switchView(viewName) {
@@ -214,15 +218,119 @@ function renderCard() {
     fcContainer.style.display = "flex";
     mcqContainer.style.display = "none";
     
+    isFlashcardFlipped = false;
+    currentRecallAttempt = "";
     fcContainer.classList.remove("revealed");
     document.getElementById("fc-question").innerText = card.question;
     document.getElementById("fc-answer").innerText = card.answer;
+
+    const recallInput = document.getElementById("fc-recall-input");
+    if (recallInput) recallInput.value = "";
+    const flipBtn = document.getElementById("fc-flip-btn");
+    if (flipBtn) flipBtn.disabled = true;
+
+    const ansContainer = document.getElementById("fc-answer-container");
+    if (ansContainer) ansContainer.style.display = "none";
+    const attemptDisplay = document.getElementById("fc-user-attempt-display");
+    if (attemptDisplay) attemptDisplay.style.display = "none";
+
+    syncThinkFirstCheckboxes();
+    updateFlashcardRecallUI();
+  }
+}
+
+function updateFlashcardRecallUI() {
+  const recallSec = document.getElementById("fc-recall-section");
+  const hintText = document.getElementById("fc-hint-text");
+  const flipBtn = document.getElementById("fc-flip-btn");
+
+  if (!isFlashcardFlipped) {
+    if (thinkFirstEnabled) {
+      if (recallSec) recallSec.style.display = "block";
+      if (flipBtn) flipBtn.disabled = !currentRecallAttempt.trim();
+      if (hintText) hintText.innerText = '(Type attempt or tap "I don\'t know" to flip)';
+    } else {
+      if (recallSec) recallSec.style.display = "none";
+      if (hintText) hintText.innerText = "(Click card to reveal answer)";
+    }
+  }
+}
+
+function onRecallInput(value) {
+  currentRecallAttempt = value;
+  const flipBtn = document.getElementById("fc-flip-btn");
+  if (flipBtn) {
+    flipBtn.disabled = !value.trim();
+  }
+}
+
+function onRecallKeydown(event) {
+  if (event.key === "Enter" && currentRecallAttempt.trim()) {
+    event.preventDefault();
+    flipFlashcard();
+  }
+}
+
+function handleIdk() {
+  currentRecallAttempt = "I don't know";
+  const recallInput = document.getElementById("fc-recall-input");
+  if (recallInput) recallInput.value = "I don't know";
+  const flipBtn = document.getElementById("fc-flip-btn");
+  if (flipBtn) flipBtn.disabled = false;
+  flipFlashcard();
+}
+
+function handleCardClick(event) {
+  if (!thinkFirstEnabled) {
+    flipFlashcard();
+    return;
+  }
+  if (isFlashcardFlipped) {
+    flipFlashcard();
+  } else {
+    const recallInput = document.getElementById("fc-recall-input");
+    if (recallInput) recallInput.focus();
   }
 }
 
 function flipFlashcard() {
+  if (thinkFirstEnabled && !isFlashcardFlipped && !currentRecallAttempt.trim()) {
+    return;
+  }
+
+  isFlashcardFlipped = !isFlashcardFlipped;
+
   const fcContainer = document.getElementById("flashcard-container");
-  fcContainer.classList.toggle("revealed");
+  const ansContainer = document.getElementById("fc-answer-container");
+  const attemptDisplay = document.getElementById("fc-user-attempt-display");
+  const recallSec = document.getElementById("fc-recall-section");
+  const hintText = document.getElementById("fc-hint-text");
+
+  if (isFlashcardFlipped) {
+    fcContainer.classList.add("revealed");
+    if (thinkFirstEnabled && currentRecallAttempt.trim()) {
+      attemptDisplay.style.display = "block";
+      attemptDisplay.innerHTML = `<strong>Your Attempt:</strong> ${escapeHtml(currentRecallAttempt.trim())}`;
+    } else {
+      attemptDisplay.style.display = "none";
+    }
+    if (recallSec) recallSec.style.display = "none";
+    if (ansContainer) ansContainer.style.display = "block";
+    if (hintText) hintText.innerText = "(Click card to flip back)";
+  } else {
+    fcContainer.classList.remove("revealed");
+    if (ansContainer) ansContainer.style.display = "none";
+    if (attemptDisplay) attemptDisplay.style.display = "none";
+    if (thinkFirstEnabled) {
+      if (recallSec) recallSec.style.display = "block";
+      const flipBtn = document.getElementById("fc-flip-btn");
+      if (flipBtn) flipBtn.disabled = !currentRecallAttempt.trim();
+      if (hintText) hintText.innerText = '(Type attempt or tap "I don\'t know" to flip)';
+    } else {
+      if (recallSec) recallSec.style.display = "none";
+      if (hintText) hintText.innerText = "(Click card to reveal answer)";
+    }
+  }
 }
 
 function checkMcqAnswer(selected, correct, question) {
@@ -526,3 +634,40 @@ function escapeXml(unsafe) {
     }
   });
 }
+function escapeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function syncThinkFirstCheckboxes() {
+  const practiceToggle = document.getElementById("practice-think-first-toggle");
+  const settingsToggle = document.getElementById("settings-think-first");
+  if (practiceToggle) practiceToggle.checked = thinkFirstEnabled;
+  if (settingsToggle) settingsToggle.checked = thinkFirstEnabled;
+}
+
+function openSettingsModal() {
+  syncThinkFirstCheckboxes();
+  const modal = document.getElementById("settings-modal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById("settings-modal");
+  if (modal) modal.classList.remove("active");
+}
+
+function toggleThinkFirst(checked) {
+  thinkFirstEnabled = checked;
+  localStorage.setItem("thinkFirstEnabled", checked ? "true" : "false");
+  syncThinkFirstCheckboxes();
+  if (currentDeck && currentDeck.cards && currentDeck.cards[currentCardIndex]?.type !== "mcq") {
+    updateFlashcardRecallUI();
+  }
+}
+

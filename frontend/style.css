@@ -358,3 +358,68 @@ input:focus, select:focus, textarea:focus {
   margin-bottom: 0;
   padding-bottom: 0;
 }
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--text-secondary);
+}
+
+.toggle-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.toggle-container input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.recall-section {
+  width: 100%;
+  max-width: 460px;
+  margin: 1.25rem auto 0;
+  text-align: center;
+}
+
+.recall-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.flashcard-answer-container {
+  width: 100%;
+  max-width: 500px;
+  margin-top: 1rem;
+}
+
+.user-attempt-box {
+  background-color: #F1F5F9;
+  border-left: 4px solid var(--accent);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  text-align: left;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.user-attempt-box strong {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.5px;
+}
+
