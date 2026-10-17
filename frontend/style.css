@@ -286,6 +286,37 @@ input:focus, select:focus, textarea:focus {
   color: #881337;
 }
 
+.mcq-option.selected {
+  background-color: #EEF2FF;
+  border-color: #6366F1;
+  color: #312E81;
+  font-weight: 600;
+}
+
+.confidence-btn.active {
+  background-color: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.toggle-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.toggle-container input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* Modal */
 .modal {
   display: none;

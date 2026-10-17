@@ -225,8 +225,12 @@ function renderCard() {
     document.getElementById("mcq-question").innerText = card.question;
     const optionsEl = document.getElementById("mcq-options");
     
+    selectedMcqOption = null;
+    selectedConfidence = null;
+    updateMcqConfidenceUI();
+    
     optionsEl.innerHTML = (card.options || [card.answer, "Option B", "Option C", "Option D"]).map(opt => `
-      <div class="mcq-option" onclick="checkMcqAnswer('${escapeQuote(opt)}', '${escapeQuote(card.answer)}', '${escapeQuote(card.question)}')">${opt}</div>
+      <div class="mcq-option" onclick="selectMcqOption(this, '${escapeQuote(opt)}', '${escapeQuote(card.answer)}', '${escapeQuote(card.question)}')">${opt}</div>
     `).join("");
   } else {
     fcContainer.style.display = "flex";
@@ -382,7 +386,98 @@ function toggleThinkFirst(checked) {
   }
 }
 
-function checkMcqAnswer(selected, correct, question) {
+let selectedMcqOption = null;
+let selectedConfidence = null;
+let sessionStats = {
+  totalAnswered: 0,
+  correct: 0,
+  confidentButWrong: 0,
+  reviewItems: []
+};
+
+function isThinkFirstActive() {
+  const toggle = document.getElementById("setting-think-first") || document.getElementById("practice-think-first-toggle");
+  if (toggle) return toggle.checked;
+  return localStorage.getItem("thinkFirstEnabled") !== "false";
+}
+
+function syncThinkFirstToggle() {
+  const toggle = document.getElementById("setting-think-first");
+  if (toggle) toggle.checked = isThinkFirstActive();
+}
+
+function toggleThinkFirst(checked) {
+  localStorage.setItem("thinkFirstEnabled", checked ? "true" : "false");
+  syncThinkFirstToggle();
+  if (currentDeck && currentDeck.cards && currentDeck.cards[currentCardIndex]?.type === "mcq") {
+    renderCard();
+  }
+}
+
+function selectMcqOption(el, selected, correct, question) {
+  selectedMcqOption = { el, selected, correct, question };
+  const optionsEl = document.getElementById("mcq-options");
+  if (optionsEl) {
+    optionsEl.querySelectorAll(".mcq-option").forEach(opt => opt.classList.remove("selected"));
+  }
+  if (el) el.classList.add("selected");
+  updateMcqConfidenceUI();
+
+  if (!isThinkFirstActive()) {
+    submitMcqAnswer();
+  }
+}
+
+function selectConfidence(level) {
+  selectedConfidence = level;
+  const btns = document.querySelectorAll(".confidence-btn");
+  btns.forEach(b => {
+    b.classList.toggle("active", b.getAttribute("data-level") === level);
+  });
+  updateMcqConfidenceUI();
+}
+
+function updateMcqConfidenceUI() {
+  const confSection = document.getElementById("mcq-confidence-section");
+  const submitBtn = document.getElementById("mcq-submit-btn");
+  const thinkFirst = isThinkFirstActive();
+
+  if (confSection) {
+    confSection.style.display = thinkFirst ? "block" : "none";
+  }
+
+  const btns = document.querySelectorAll(".confidence-btn");
+  btns.forEach(b => {
+    b.classList.toggle("active", b.getAttribute("data-level") === selectedConfidence);
+  });
+
+  if (submitBtn) {
+    submitBtn.disabled = !(selectedMcqOption && selectedConfidence);
+  }
+}
+
+function submitMcqAnswer() {
+  if (!selectedMcqOption) return;
+  const { el, selected, correct, question } = selectedMcqOption;
+  const confidence = selectedConfidence || "Unsure";
+  const isCorrect = (selected.trim() === correct.trim());
+  const isConfidentButWrong = (!isCorrect && confidence === "Sure");
+
+  sessionStats.totalAnswered++;
+  if (isCorrect) {
+    sessionStats.correct++;
+  } else if (isConfidentButWrong) {
+    sessionStats.confidentButWrong++;
+    sessionStats.reviewItems.push({ question, user_answer: selected, correct_answer: correct, confidence });
+  }
+
+  const countEl = document.getElementById("stats-confident-wrong-count");
+  if (countEl) countEl.innerText = sessionStats.confidentButWrong;
+
+  checkMcqAnswer(selected, correct, question, isConfidentButWrong);
+}
+
+function checkMcqAnswer(selected, correct, question, isConfidentButWrong = false) {
   const optionsEl = document.getElementById("mcq-options");
   const opts = optionsEl.querySelectorAll(".mcq-option");
   
@@ -395,22 +490,79 @@ function checkMcqAnswer(selected, correct, question) {
     }
   });
 
+  const submitBtn = document.getElementById("mcq-submit-btn");
+  if (submitBtn) submitBtn.disabled = true;
+
   if (selected.trim() === correct.trim()) {
-    // Correct! Wait 1.2s and go next
     setTimeout(() => {
       nextCard();
     }, 1200);
   } else {
-    // Incorrect! Trigger AI Explainer modal
     currentWrongContext = {
       question,
       user_answer: selected,
-      correct_answer: correct
+      correct_answer: correct,
+      isConfidentButWrong
     };
     setTimeout(() => {
+      const priorityBadge = document.getElementById("explainer-priority-badge");
+      if (priorityBadge) {
+        priorityBadge.style.display = isConfidentButWrong ? "inline-block" : "none";
+      }
       openExplainerModal();
     }, 600);
   }
+}
+
+function openSessionSummaryModal() {
+  const totalEl = document.getElementById("summary-total-cards");
+  const correctEl = document.getElementById("summary-correct-cards");
+  const confidentWrongEl = document.getElementById("summary-confident-wrong-cards");
+
+  if (totalEl) totalEl.innerText = sessionStats.totalAnswered;
+  if (correctEl) correctEl.innerText = sessionStats.correct;
+  if (confidentWrongEl) confidentWrongEl.innerText = sessionStats.confidentButWrong;
+
+  const reviewList = document.getElementById("summary-review-list");
+  if (reviewList) {
+    if (!sessionStats.reviewItems.length) {
+      reviewList.innerHTML = `<p style="color: var(--text-secondary); font-size: 0.9rem;">No confident-but-wrong answers so far! Great self-assessment.</p>`;
+    } else {
+      reviewList.innerHTML = `
+        <h4 style="margin-bottom: 0.75rem; color: #991B1B;">High Priority Review Topics (${sessionStats.reviewItems.length}):</h4>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+          ${sessionStats.reviewItems.map(item => `
+            <div style="background: white; border: 1px solid var(--border); border-left: 4px solid #E11D48; padding: 0.75rem; border-radius: 4px; text-align: left;">
+              <strong>${item.question}</strong>
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Your Answer: <span style="color: #991B1B; text-decoration: line-through;">${item.user_answer}</span> (Confidence: ${item.confidence}) &bull; Correct: <span style="color: #134E4A; font-weight: 600;">${item.correct_answer}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+  }
+
+  document.getElementById("session-summary-modal").classList.add("active");
+}
+
+function closeSessionSummaryModal() {
+  document.getElementById("session-summary-modal").classList.remove("active");
+}
+
+function restartPractice() {
+  sessionStats = {
+    totalAnswered: 0,
+    correct: 0,
+    confidentButWrong: 0,
+    reviewItems: []
+  };
+  const countEl = document.getElementById("stats-confident-wrong-count");
+  if (countEl) countEl.innerText = 0;
+  closeSessionSummaryModal();
+  currentCardIndex = 0;
+  renderCard();
 }
 
 function nextCard() {

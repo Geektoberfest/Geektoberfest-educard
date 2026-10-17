@@ -87,7 +87,18 @@
       </div>
 
       <div class="practice-container">
-        <div id="practice-progress" class="badge">Card 1 of 5</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div id="practice-progress" class="badge">Card 1 of 5</div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label class="toggle-container" title="Require confidence rating before submitting MCQ" style="font-size: 0.8rem;">
+              <input type="checkbox" id="setting-think-first" checked onchange="toggleThinkFirst(this.checked)">
+              <span>Think First</span>
+            </label>
+            <div id="session-stats-summary" class="badge" style="background: #FEF3C7; color: #92400E; cursor: pointer;" onclick="openSessionSummaryModal()">
+              Confident &amp; Wrong: <span id="stats-confident-wrong-count">0</span>
+            </div>
+          </div>
+        </div>
         
         <div id="flashcard-container" class="flashcard-box" onclick="handleCardClick()">
           <div id="fc-question" class="flashcard-question">Loading question...</div>
@@ -119,6 +130,16 @@
         <div id="mcq-container" style="display: none;">
           <div id="mcq-question" class="flashcard-question" style="text-align: left; margin-bottom: 1rem;">Question</div>
           <div id="mcq-options" class="mcq-options"></div>
+
+          <div id="mcq-confidence-section" style="margin-top: 1rem; text-align: left;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem;">How confident are you in this answer?</label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <button type="button" class="btn btn-secondary confidence-btn" data-level="Guessing" onclick="selectConfidence('Guessing')">Guessing</button>
+              <button type="button" class="btn btn-secondary confidence-btn" data-level="Unsure" onclick="selectConfidence('Unsure')">Unsure</button>
+              <button type="button" class="btn btn-secondary confidence-btn" data-level="Sure" onclick="selectConfidence('Sure')">Sure</button>
+            </div>
+            <button type="button" id="mcq-submit-btn" class="btn" style="width: 100%;" onclick="submitMcqAnswer()" disabled>Submit Answer</button>
+          </div>
         </div>
 
         <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
@@ -172,6 +193,9 @@
       </div>
       <h3 id="explainer-question-title">Explanation</h3>
       <p id="explainer-summary" style="margin-bottom: 1rem; color: var(--text-secondary);"></p>
+      <div id="explainer-priority-badge" class="badge" style="display: none; background: #FEE2E2; color: #991B1B; border: 1px solid #F87171; font-weight: 700; margin-bottom: 0.75rem;">
+        ⚠️ Confident but Wrong — High Priority to Review!
+      </div>
       
       <div class="form-group">
         <label for="understanding-level">Select Your Understanding Level:</label>
@@ -235,22 +259,23 @@
     </div>
   </div>
 
-  <!-- Study Settings Modal -->
-  <div id="settings-modal" class="modal">
+
+  <!-- Session Summary Modal -->
+  <div id="session-summary-modal" class="modal">
     <div class="modal-content">
-      <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
-      <h3>Study Settings</h3>
-      <div class="settings-list">
-        <div class="setting-item">
-          <div class="setting-info">
-            <strong>Think First (Active Recall)</strong>
-            <p class="subtitle" style="margin-bottom: 0;">Require typing a recall attempt or tapping &quot;I don't know&quot; before flipping flashcards.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="setting-think-first" checked onchange="toggleThinkFirst(this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
+      <button class="close-btn" onclick="closeSessionSummaryModal()">&times;</button>
+      <h3>Practice Session Summary</h3>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">Track your performance and priority review topics.</p>
+      <div class="panel" style="background: #F8FAFC; margin-bottom: 1.5rem; padding: 1.25rem;">
+        <p style="margin-bottom: 0.5rem;"><strong>Total Answered:</strong> <span id="summary-total-cards">0</span></p>
+        <p style="margin-bottom: 0.5rem; color: #134E4A;"><strong>Correct Answers:</strong> <span id="summary-correct-cards">0</span></p>
+        <p style="margin-bottom: 0; color: #991B1B;"><strong>Confident but Wrong:</strong> <span id="summary-confident-wrong-cards">0</span> <span class="badge" style="background: #FFE4E6; color: #881337; margin-left: 0.5rem; margin-bottom: 0;">High Priority Review</span></p>
+      </div>
+      <div id="summary-review-list"></div>
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeSessionSummaryModal()">Close</button>
+        <button class="btn" onclick="restartPractice()">Reset Stats</button>
+
       </div>
     </div>
   </div>
